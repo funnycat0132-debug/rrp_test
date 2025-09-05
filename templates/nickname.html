@@ -2,22 +2,24 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>R-RP 07 Тест на 9-й ранг</title>
+    <title>{{ title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<div class="container">
-    <h1>R-RP 07 Тест на 9-й ранг</h1>
-    <form method="POST">
-        <input type="text" name="nickname" placeholder="Имя_Фамилия" required>
-        <input type="text" name="goal" placeholder="С какой целью идете на 9-й ранг?" required>
-        <input type="text" name="time_commit" placeholder="Сколько готовы уделять времени на посту?" required>
-        <br><br>
-        <button type="submit" class="submit-btn" style="background-color:#ff9800;">Начать тест</button>
-    </form>
-    {% if error %}
-    <p style="color:red">{{ error }}</p>
-    {% endif %}
-</div>
+    <div class="container">
+        <h1>{{ title }}</h1>
+        {% if error %}
+            <p style="color:red">{{ error }}</p>
+        {% endif %}
+        <form method="POST">
+            <input type="text" name="nickname" placeholder="Имя_Фамилия" required>
+            <br><br>
+            <input type="text" name="goal" placeholder="С какой целью идете на 9-й ранг?" required>
+            <br><br>
+            <input type="text" name="time_commit" placeholder="Сколько готовы уделять времени на данном посту?" required>
+            <br><br>
+            <button type="submit" class="submit-btn" style="background-color:#ff9800;">Начать тест</button>
+        </form>
+    </div>
 </body>
 </html>

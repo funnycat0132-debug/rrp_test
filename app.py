@@ -19,8 +19,8 @@ with open('questions.json', encoding='utf-8') as f:
 
 # Функция отправки сообщений в Telegram
 def send_telegram(message):
-    token = "8476542537:AAGrdS3eIWIRdWW7Iv-TpkQe5455EoEBGUo"  # Твой токен
-    chat_id = "1932300541"  # Твой chat_id
+    token = os.environ.get('TG_TOKEN')
+    chat_id = os.environ.get('TG_CHAT_ID')
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     params = {
         'chat_id': chat_id,
@@ -59,8 +59,8 @@ def index():
                 
                 return redirect(url_for('question'))
             else:
-                return render_template("nickname.html", error="Заполните все поля")
-        return render_template("nickname.html")
+                return render_template("nickname.html", error="Заполните все поля", title="Тестирование на пост заместителя R RP 07")
+        return render_template("nickname.html", title="Тестирование на пост заместителя R RP 07")
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
@@ -86,7 +86,8 @@ def question():
             question=question,
             question_number=current,
             total=len(questions_list),
-            nickname=session.get('nickname')
+            nickname=session.get('nickname'),
+            title="Тестирование на пост заместителя R RP 07"
         )
     except Exception as e:
         traceback.print_exc()
@@ -116,7 +117,7 @@ def result():
         session.clear()
 
         # Показываем только сообщение без ответов и времени
-        return render_template("result.html", nickname=nickname)
+        return render_template("result.html", nickname=nickname, title="Тестирование на пост заместителя R RP 07")
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
