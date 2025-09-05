@@ -2,19 +2,20 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Вопрос {{ question_number + 1 }} из {{ total }}</title>
+    <title>Тестирование на пост заместителя R RP 07</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1 class="title">Тестирование на пост заместителя R RP 07</h1>
-        
+        <h1>Тестирование на пост заместителя R RP 07</h1>
         <h2>Вопрос {{ question_number + 1 }} из {{ total }}</h2>
-        <p><b>{{ question }}</b></p>
-
+        <p>{{ question["question"] }}</p>
         <form method="POST">
-            <textarea name="answer" required></textarea><br>
-            <button type="submit" class="button">Далее</button>
+            <input type="text" name="answer" placeholder="Введите свой ответ" required>
+            <input type="hidden" name="question_number" value="{{ question_number }}">
+            <input type="hidden" name="nickname" value="{{ nickname }}">
+            <br><br>
+            <button type="submit" class="submit-btn">Далее</button>
         </form>
     </div>
 </body>
