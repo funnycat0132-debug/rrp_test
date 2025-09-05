@@ -19,8 +19,8 @@ with open('questions.json', encoding='utf-8') as f:
 
 # Функция отправки сообщений в Telegram
 def send_telegram(message):
-    token = os.environ.get('TG_TOKEN')
-    chat_id = os.environ.get('TG_CHAT_ID')
+    token = "8476542537:AAGrdS3eIWIRdWW7Iv-TpkQe5455EoEBGUo"  # Твой токен
+    chat_id = "1932300541"  # Твой chat_id
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     params = {
         'chat_id': chat_id,
