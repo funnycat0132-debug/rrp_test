@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import os
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"  # нужно для сессий
@@ -13,8 +14,15 @@ with open('questions.json', encoding='utf-8') as f:
 
 # Google Sheets setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+
+# Загружаем credentials из переменной окружения
+creds_json = os.environ.get("GOOGLE_CREDS")
+if not creds_json:
+    raise RuntimeError("Не найдена переменная окружения GOOGLE_CREDS")
+creds_dict = json.loads(creds_json)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
+
 sheet = client.open("rrp07test").sheet1  # первая вкладка
 
 @app.route("/", methods=["GET", "POST"])
@@ -42,7 +50,13 @@ def question():
         return redirect(url_for('question'))
 
     question = questions[current]
-    return render_template("question.html", question=question, index=current+1, total=len(questions), nickname=session.get('nickname'))
+    return render_template(
+        "question.html",
+        question=question,
+        index=current+1,
+        total=len(questions),
+        nickname=session.get('nickname')
+    )
 
 @app.route("/result")
 def result():
@@ -59,9 +73,13 @@ def result():
     # Очистка сессии
     session.clear()
 
-    return render_template("result.html", nickname=nickname, answers=answers, total_time=total_time)
+    return render_template(
+        "result.html",
+        nickname=nickname,
+        answers=answers,
+        total_time=total_time
+    )
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
