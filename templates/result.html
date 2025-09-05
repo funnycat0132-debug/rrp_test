@@ -2,14 +2,15 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>{{ title }}</title>
+    <title>Результаты</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>{{ title }}</h1>
-        <p>Спасибо, {{ nickname }}!</p>
-        <p>Ваши данные успешно отправлены.</p>
+        <h1 class="title">Тестирование на пост заместителя R RP 07</h1>
+
+        <h2>Спасибо за прохождение теста, {{ nickname }}!</h2>
+        <p>Ваши результаты были отправлены администрации.</p>
     </div>
 </body>
 </html>
