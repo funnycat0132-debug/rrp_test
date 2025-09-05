@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 import traceback
 import requests
+import random
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_123"  # можно заменить на любое
@@ -45,6 +46,9 @@ def index():
 @app.route("/question", methods=["GET", "POST"])
 def question():
     try:
+        if 'nickname' not in session:
+            return redirect(url_for('index'))
+
         current = session.get('current', 0)
         if current >= len(questions):
             return redirect(url_for('result'))
@@ -71,25 +75,21 @@ def question():
 def result():
     try:
         nickname = session.get('nickname')
-        answers = session.get('answers', [])
+        if not nickname:
+            return redirect(url_for('index'))
+
         start_time = datetime.fromisoformat(session.get('start_time'))
         end_time = datetime.now()
         total_time = (end_time - start_time).total_seconds()
 
-        # Формируем сообщение для Telegram
-        msg = "\n".join([f"{i+1}. {a}" for i, a in enumerate(answers)])
-        msg = f"Новый ответ от {nickname}:\n{msg}\nВремя: {total_time:.1f} сек"
+        # Отправляем в Telegram ник + время прохождения
+        msg = f"Новый участник прошёл тест: {nickname}\nВремя прохождения: {total_time:.1f} сек"
         send_tg(msg)
 
-        # Очистка сессии
+        # Очистка сессии, чтобы нельзя было пройти снова
         session.clear()
 
-        return render_template(
-            "result.html",
-            nickname=nickname,
-            answers=answers,
-            total_time=total_time
-        )
+        return render_template("result.html", nickname=nickname)
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"

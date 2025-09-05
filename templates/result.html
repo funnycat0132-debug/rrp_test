@@ -8,16 +8,7 @@
 <body>
     <div class="container">
         <h1>Спасибо, {{ nickname }}!</h1>
-        <p>Вы прошли тест за {{ total_time }} секунд.</p>
-        
-        <h2>Ваши ответы:</h2>
-        <ol>
-        {% for ans in answers %}
-            <li>{{ ans }}</li>
-        {% endfor %}
-        </ol>
-
-        <a href="{{ url_for('index') }}" class="submit-btn">Пройти тест снова</a>
+        <p>Вы успешно прошли тест.</p>
     </div>
 </body>
 </html>
