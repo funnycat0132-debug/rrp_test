@@ -59,8 +59,8 @@ def index():
                 
                 return redirect(url_for('question'))
             else:
-                return render_template("nickname.html", error="Заполните все поля", title="Тестирование на пост заместителя R RP 07")
-        return render_template("nickname.html", title="Тестирование на пост заместителя R RP 07")
+                return render_template("nickname.html", error="Заполните все поля")
+        return render_template("nickname.html")
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
@@ -86,8 +86,7 @@ def question():
             question=question,
             question_number=current,
             total=len(questions_list),
-            nickname=session.get('nickname'),
-            title="Тестирование на пост заместителя R RP 07"
+            nickname=session.get('nickname')
         )
     except Exception as e:
         traceback.print_exc()
@@ -103,21 +102,24 @@ def result():
         start_time = datetime.fromisoformat(session.get('start_time'))
         end_time = datetime.now()
         total_time = (end_time - start_time).total_seconds()
+        questions_list = session.get('questions', questions)
 
         # Формируем сообщение для Telegram
         msg = f"<b>Новый участник прошёл тест</b>:\n"
         msg += f"<b>Ник:</b> {nickname}\n<b>Цель:</b> {goal}\n<b>Время на посту:</b> {time_commit}\n"
-        msg += f"<b>Время прохождения:</b> {total_time:.1f} сек\n<b>Ответы:</b>\n"
-        for i, ans in enumerate(answers):
-            msg += f"{i+1}. {ans}\n"
+        msg += f"<b>Время прохождения:</b> {total_time:.1f} сек\n\n"
+        msg += f"<b>Ответы:</b>\n"
+
+        for i, (q, ans) in enumerate(zip(questions_list, answers), start=1):
+            msg += f"{i}. <b>{q}</b>\nОтвет: {ans}\n\n"
 
         send_telegram(msg)
 
         # Очистка сессии
         session.clear()
 
-        # Показываем только сообщение без ответов и времени
-        return render_template("result.html", nickname=nickname, title="Тестирование на пост заместителя R RP 07")
+        # Показываем только сообщение без вопросов/ответов
+        return render_template("result.html", nickname=nickname)
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
