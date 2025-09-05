@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>R-RP 07 Тест на 9-й ранг</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>R-RP 07 Тест на 9-й ранг</h1>
+        <form method="POST">
+            {% for q in questions %}
+                <div class="question-block">
+                    <p>{{ loop.index }}. {{ q.question }}</p>
+                    {% for option in q.options %}
+                        <label>
+                            <input type="radio" name="q{{ loop.index0 }}" value="{{ option }}" required>
+                            {{ option }}
+                        </label><br>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="submit-btn">Отправить</button>
+        </form>
+    </div>
+</body>
+</html>

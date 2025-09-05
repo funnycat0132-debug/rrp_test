@@ -1,0 +1,105 @@
+/* Общие настройки */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    
+    /* Однотонный приятный жёлто-оранжевый фон */
+    background-color: #ffe0b2; /* мягкий светло-оранжевый */
+    transition: background 0.5s ease;
+}
+
+/* Контейнер */
+.container {
+    width: 90%;
+    max-width: 700px;
+    background: rgba(255, 255, 255, 0.9); /* полупрозрачный белый блок для текста */
+    padding: 50px 40px;
+    border-radius: 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    animation: fadeIn 0.8s ease;
+}
+
+/* Анимация появления */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Заголовки */
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 32px;
+    letter-spacing: 1px;
+}
+
+/* Вопрос */
+p {
+    font-size: 20px;
+    margin: 20px 0;
+    line-height: 1.4;
+}
+
+/* Поле ввода */
+input[type="text"] {
+    width: 80%;
+    padding: 14px 12px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    outline: none;
+    transition: all 0.3s ease;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+}
+
+input[type="text"]:focus {
+    border-color: #ff9800;
+    box-shadow: 0 0 10px rgba(255, 152, 0, 0.3);
+}
+
+/* Кнопка */
+.submit-btn {
+    margin-top: 25px;
+    padding: 14px 35px;
+    background: #ff9800; /* тёплый оранжевый */
+    color: white;
+    font-size: 18px;
+    border: none;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.submit-btn:hover {
+    background: #fb8c00;
+    transform: scale(1.08);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+/* Список ответов */
+ol {
+    text-align: left;
+    margin: 25px auto;
+    padding-left: 25px;
+    font-size: 18px;
+}
+
+/* Мобильная адаптация */
+@media (max-width: 600px) {
+    .container {
+        padding: 30px 20px;
+    }
+    input[type="text"] {
+        width: 100%;
+    }
+    .submit-btn {
+        width: 100%;
+    }
+}
