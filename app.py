@@ -1,17 +1,12 @@
 from flask import Flask, render_template, request, session, redirect, url_for
 import json
 from datetime import datetime
-import os
 import traceback
 import requests
 import random
-from dotenv import load_dotenv
-
-# Загружаем .env
-load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret")
+app.secret_key = "fallback_secret"  # Сессии
 
 # Загружаем вопросы
 with open('questions.json', encoding='utf-8') as f:
@@ -19,8 +14,8 @@ with open('questions.json', encoding='utf-8') as f:
 
 # Функция отправки сообщений в Telegram
 def send_telegram(message):
-    token = os.environ.get('TG_TOKEN')
-    chat_id = os.environ.get('TG_CHAT_ID')
+    token = "8476542537:AAGrdS3eIWIRdWW7Iv-TpkQe5455EoEBGUo"
+    chat_id = "1932300541"
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     params = {
         'chat_id': chat_id,
@@ -41,6 +36,9 @@ def send_telegram(message):
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
+        if session.get("finished"):  # нельзя пройти заново
+            return render_template("result.html", nickname=session.get('nickname'))
+
         if request.method == "POST":
             nickname = request.form.get("nickname", "").strip()
             goal = request.form.get("goal", "").strip()
@@ -53,10 +51,7 @@ def index():
                 session['answers'] = []
                 session['current'] = 0
                 session['start_time'] = datetime.now().isoformat()
-                
-                # Перемешиваем вопросы
                 session['questions'] = random.sample(questions, len(questions))
-                
                 return redirect(url_for('question'))
             else:
                 return render_template("nickname.html", error="Заполните все поля")
@@ -102,28 +97,23 @@ def result():
         start_time = datetime.fromisoformat(session.get('start_time'))
         end_time = datetime.now()
         total_time = (end_time - start_time).total_seconds()
-        questions_list = session.get('questions', questions)
 
         # Формируем сообщение для Telegram
         msg = f"<b>Новый участник прошёл тест</b>:\n"
         msg += f"<b>Ник:</b> {nickname}\n<b>Цель:</b> {goal}\n<b>Время на посту:</b> {time_commit}\n"
-        msg += f"<b>Время прохождения:</b> {total_time:.1f} сек\n\n"
-        msg += f"<b>Ответы:</b>\n"
-
-        for i, (q, ans) in enumerate(zip(questions_list, answers), start=1):
-            msg += f"{i}. <b>{q}</b>\nОтвет: {ans}\n\n"
+        msg += f"<b>Время прохождения:</b> {total_time:.1f} сек\n<b>Ответы:</b>\n"
+        questions_list = session.get('questions', questions)
+        for q, a in zip(questions_list, answers):
+            msg += f"<b>{q['question']}</b>\nОтвет: {a}\n"
 
         send_telegram(msg)
 
-        # Очистка сессии
-        session.clear()
-
-        # Показываем только сообщение без вопросов/ответов
+        session['finished'] = True  # блокируем повторное прохождение
         return render_template("result.html", nickname=nickname)
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = 5000
     app.run(host="0.0.0.0", port=port, debug=True)
