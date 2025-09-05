@@ -6,17 +6,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>R-RP 07 Тест на 9-й ранг</h1>
-        <h2>Вопрос {{ question_number + 1 }} из {{ total }}</h2>
-        <p>{{ question["question"] }}</p>
-        <form method="POST">
-            <input type="text" name="answer" placeholder="Введите свой ответ" required style="width:100%; padding:8px; font-size:16px;">
-            <input type="hidden" name="question_number" value="{{ question_number }}">
-            <input type="hidden" name="nickname" value="{{ nickname }}">
-            <br><br>
-            <button type="submit" class="submit-btn">Далее</button>
-        </form>
-    </div>
+<div class="container">
+    <h1>R-RP 07 Тест на 9-й ранг</h1>
+    <h2>Вопрос {{ question_number + 1 }} из {{ total }}</h2>
+    <p>{{ question["question"] }}</p>
+    <form method="POST">
+        <input type="text" name="answer" placeholder="Введите свой ответ" required style="width:100%; padding:8px; font-size:16px;">
+        <br><br>
+        <button type="submit" class="submit-btn">Далее</button>
+    </form>
+</div>
 </body>
 </html>

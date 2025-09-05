@@ -1,26 +1,39 @@
 from flask import Flask, render_template, request, session, redirect, url_for
 import json
 from datetime import datetime
+import os
 import traceback
 import requests
 import random
+from dotenv import load_dotenv
+
+# Загружаем .env
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key_123"  # можно заменить на любое
+app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret")
 
 # Загружаем вопросы
 with open('questions.json', encoding='utf-8') as f:
     questions = json.load(f)
 
 # Функция отправки сообщений в Telegram
-def send_tg(message):
-    chat_id = 1932300541  # твой TG_CHAT_ID
-    url = "https://api.telegram.org/bot8476542537:AAGrdS3eIWIRdWW7Iv-TpkQe5455EoEBGUo/sendMessage"
-    payload = {'chat_id': chat_id, 'text': message}
+def send_telegram(message):
+    token = os.environ.get('TG_TOKEN')
+    chat_id = os.environ.get('TG_CHAT_ID')
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    params = {
+        'chat_id': chat_id,
+        'text': message,
+        'parse_mode': 'HTML'
+    }
     try:
-        res = requests.post(url, data=payload)
-        print("Telegram API ответ:", res.json())
-        return res.json()
+        res = requests.get(url, params=params)
+        response = res.json()
+        print("Telegram API ответ:", response)
+        if not response.get("ok"):
+            print("Ошибка Telegram:", response)
+        return response
     except Exception as e:
         print("Ошибка при отправке в Telegram:", e)
         return None
@@ -30,14 +43,23 @@ def index():
     try:
         if request.method == "POST":
             nickname = request.form.get("nickname", "").strip()
-            if nickname:
+            goal = request.form.get("goal", "").strip()
+            time_commit = request.form.get("time_commit", "").strip()
+            
+            if nickname and goal and time_commit:
                 session['nickname'] = nickname
-                session['current'] = 0
+                session['goal'] = goal
+                session['time_commit'] = time_commit
                 session['answers'] = []
+                session['current'] = 0
                 session['start_time'] = datetime.now().isoformat()
+                
+                # Перемешиваем вопросы
+                session['questions'] = random.sample(questions, len(questions))
+                
                 return redirect(url_for('question'))
             else:
-                return render_template("nickname.html", error="Введите ник")
+                return render_template("nickname.html", error="Заполните все поля")
         return render_template("nickname.html")
     except Exception as e:
         traceback.print_exc()
@@ -46,11 +68,10 @@ def index():
 @app.route("/question", methods=["GET", "POST"])
 def question():
     try:
-        if 'nickname' not in session:
-            return redirect(url_for('index'))
-
         current = session.get('current', 0)
-        if current >= len(questions):
+        questions_list = session.get('questions', questions)
+        
+        if current >= len(questions_list):
             return redirect(url_for('result'))
 
         if request.method == "POST":
@@ -59,12 +80,12 @@ def question():
             session['current'] = current + 1
             return redirect(url_for('question'))
 
-        question = questions[current]
+        question = questions_list[current]
         return render_template(
             "question.html",
             question=question,
             question_number=current,
-            total=len(questions),
+            total=len(questions_list),
             nickname=session.get('nickname')
         )
     except Exception as e:
@@ -75,24 +96,31 @@ def question():
 def result():
     try:
         nickname = session.get('nickname')
-        if not nickname:
-            return redirect(url_for('index'))
-
+        answers = session.get('answers', [])
+        goal = session.get('goal')
+        time_commit = session.get('time_commit')
         start_time = datetime.fromisoformat(session.get('start_time'))
         end_time = datetime.now()
         total_time = (end_time - start_time).total_seconds()
 
-        # Отправляем в Telegram ник + время прохождения
-        msg = f"Новый участник прошёл тест: {nickname}\nВремя прохождения: {total_time:.1f} сек"
-        send_tg(msg)
+        # Формируем сообщение для Telegram
+        msg = f"<b>Новый участник прошёл тест</b>:\n"
+        msg += f"<b>Ник:</b> {nickname}\n<b>Цель:</b> {goal}\n<b>Время на посту:</b> {time_commit}\n"
+        msg += f"<b>Время прохождения:</b> {total_time:.1f} сек\n<b>Ответы:</b>\n"
+        for i, ans in enumerate(answers):
+            msg += f"{i+1}. {ans}\n"
 
-        # Очистка сессии, чтобы нельзя было пройти снова
+        send_telegram(msg)
+
+        # Очистка сессии
         session.clear()
 
+        # Показываем только сообщение без ответов и времени
         return render_template("result.html", nickname=nickname)
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
