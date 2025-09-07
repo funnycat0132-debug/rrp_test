@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, session, redirect, url_for
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 import traceback
 import requests
@@ -18,21 +18,21 @@ app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret")
 with open('questions.json', encoding='utf-8') as f:
     questions = json.load(f)
 
-USERS_FILE = "users.json"
+# Файл для отслеживания времени прохождения пользователей
+USERS_FILE = 'users.json'
 
-# Функции для работы с users.json
 def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    with open(USERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
 
-def save_users(data):
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+def save_users(users_data):
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users_data, f, indent=2, ensure_ascii=False)
 
 # Функция отправки сообщений в Telegram
-def send_telegram(message):
+def send_telegram(message: str):
     token = os.environ.get('TG_TOKEN')
     chat_id = os.environ.get('TG_CHAT_ID')
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -55,43 +55,38 @@ def send_telegram(message):
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
-        error_msg = None
         if request.method == "POST":
             nickname = request.form.get("nickname", "").strip()
             goal = request.form.get("goal", "").strip()
             time_commit = request.form.get("time_commit", "").strip()
-
-            if not (nickname and goal and time_commit):
-                error_msg = "Заполните все поля"
-                return render_template("nickname.html", error=error_msg)
+            
+            if not nickname or not goal or not time_commit:
+                return render_template("nickname.html", error="Заполните все поля")
 
             users_data = load_users()
             last_time_str = users_data.get(nickname, {}).get('last_time')
             if last_time_str:
                 last_time = datetime.fromisoformat(last_time_str)
-                next_allowed = last_time + timedelta(days=2)
-                now = datetime.now()
-                if now < next_allowed:
-                    remaining = next_allowed - now
-                    hours, remainder = divmod(remaining.total_seconds(), 3600)
-                    minutes, seconds = divmod(remainder, 60)
-                    error_msg = (f"Повторно пройти тест можно через "
-                                 f"{int(hours)} ч {int(minutes)} мин {int(seconds)} сек")
-                    return render_template("nickname.html", error=error_msg)
-
-            # Сохраняем в сессию
+                delta = datetime.now() - last_time
+                if delta.total_seconds() < 48*3600:
+                    remaining = 48*3600 - delta.total_seconds()
+                    hours = int(remaining // 3600)
+                    minutes = int((remaining % 3600) // 60)
+                    seconds = int(remaining % 60)
+                    return render_template("nickname.html", error=f"Повторно можно пройти через {hours} ч {minutes} м {seconds} с")
+            
             session['nickname'] = nickname
             session['goal'] = goal
             session['time_commit'] = time_commit
             session['answers'] = []
-            session['times'] = []  # время на каждый вопрос
             session['current'] = 0
             session['start_time'] = datetime.now().isoformat()
+            # Перемешиваем вопросы
             session['questions'] = random.sample(questions, len(questions))
-
+            
             return redirect(url_for('question'))
 
-        return render_template("nickname.html", error=error_msg)
+        return render_template("nickname.html")
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
@@ -106,21 +101,21 @@ def question():
             return redirect(url_for('result'))
 
         if request.method == "POST":
-            answer = request.form.get("answer", "").strip()
-            session['answers'].append(answer if answer else "—")
-            end_time = datetime.now()
-            start_time = datetime.fromisoformat(session.get('question_start', session['start_time']))
-            session['times'].append((end_time - start_time).total_seconds())
+            answer_text = request.form.get("answer", "").strip()
+            start_time = datetime.fromisoformat(session.get('start_time'))
+            answer_time = (datetime.now() - start_time).total_seconds()
+            session['answers'].append({'answer': answer_text if answer_text else "—", 'time': answer_time})
             session['current'] = current + 1
+            # Обновляем время старта для следующего вопроса
+            session['start_time'] = datetime.now().isoformat()
             return redirect(url_for('question'))
 
-        # Запоминаем время начала вопроса
-        session['question_start'] = datetime.now().isoformat()
-        question = questions_list[current]
+        question_data = questions_list[current]
+        question_text = question_data['question'] if isinstance(question_data, dict) else str(question_data)
         return render_template(
             "question.html",
-            question=question,
-            question_number=current + 1,  # визуально с 1
+            question=question_text,
+            question_number=current + 1,
             total=len(questions_list),
             nickname=session.get('nickname')
         )
@@ -133,30 +128,43 @@ def result():
     try:
         nickname = session.get('nickname')
         answers = session.get('answers', [])
-        times = session.get('times', [])
+        questions_list = session.get('questions', questions)
         goal = session.get('goal')
         time_commit = session.get('time_commit')
         start_time = datetime.fromisoformat(session.get('start_time'))
         end_time = datetime.now()
-        total_time = (end_time - start_time).total_seconds()
-        avg_time = sum(times)/len(times) if times else 0
+        total_time = sum(a['time'] for a in answers)
+        avg_time = total_time / len(answers) if answers else 0
 
-        # Сохраняем время прохождения
+        # Формируем заголовок сообщения
+        msg_header = f"<b>🎯 Новый участник прошёл тест 🎯</b>\n\n" \
+                     f"<b>Ник:</b> {html.escape(nickname)}\n" \
+                     f"<b>Цель:</b> {html.escape(goal)}\n" \
+                     f"<b>Время на посту:</b> {html.escape(time_commit)}\n" \
+                     f"<b>Общее время:</b> {total_time:.1f} сек\n" \
+                     f"<b>Среднее время на вопрос:</b> {avg_time:.1f} сек\n\n"
+
+        # Формируем блок с вопросами и ответами
+        msg_answers = ""
+        for i, ans in enumerate(answers):
+            q = questions_list[i]
+            q_text = q['question'] if isinstance(q, dict) else str(q)
+            a_text = ans['answer']
+            a_time = ans['time']
+            msg_answers += f"--------------------\n" \
+                           f"<b>{i+1}. {html.escape(q_text)}</b>\n" \
+                           f"Ответ: {html.escape(a_text)} (Время: {a_time:.1f} сек)\n"
+
+        # Разбиваем сообщение на части по 4000 символов
+        full_msg = msg_header + msg_answers
+        max_len = 4000
+        for i in range(0, len(full_msg), max_len):
+            send_telegram(full_msg[i:i+max_len])
+
+        # Сохраняем время прохождения пользователя
         users_data = load_users()
         users_data[nickname] = {'last_time': datetime.now().isoformat()}
         save_users(users_data)
-
-        # Формируем сообщения для Telegram (разбиваем на блоки по ~4000 символов)
-        msg_base = f"<b>Новый участник прошёл тест</b>:\n<b>Ник:</b> {nickname}\n<b>Цель:</b> {goal}\n<b>Время на посту:</b> {time_commit}\n<b>Общее время:</b> {total_time:.1f} сек\n<b>Среднее время на вопрос:</b> {avg_time:.1f} сек\n\n"
-        msg = msg_base
-        block = ""
-        for i, (q, a, t) in enumerate(zip(session.get('questions'), answers, times)):
-            block += f"<b>{i+1}. {html.escape(q if isinstance(q, str) else str(q))}</b>\nОтвет: {html.escape(a)}\nВремя: {t:.1f} сек\n\n"
-            if len(msg + block) > 3500:  # ограничение на длину
-                send_telegram(msg + block)
-                block = ""
-        if block:
-            send_telegram(msg + block)
 
         # Очистка сессии
         session.clear()
