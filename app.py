@@ -5,8 +5,8 @@ import os
 import traceback
 import requests
 import random
-from dotenv import load_dotenv
 import html
+from dotenv import load_dotenv
 
 # Загружаем .env
 load_dotenv()
@@ -14,7 +14,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret")
 
-# Загружаем вопросы
+# Файл с вопросами
 with open('questions.json', encoding='utf-8') as f:
     questions = json.load(f)
 
@@ -63,6 +63,7 @@ def index():
             if not nickname or not goal or not time_commit:
                 return render_template("nickname.html", error="Заполните все поля")
 
+            # Проверяем повторное прохождение
             users_data = load_users()
             last_time_str = users_data.get(nickname, {}).get('last_time')
             if last_time_str:
@@ -73,15 +74,18 @@ def index():
                     hours = int(remaining // 3600)
                     minutes = int((remaining % 3600) // 60)
                     seconds = int(remaining % 60)
-                    return render_template("nickname.html", error=f"Повторно можно пройти через {hours} ч {minutes} м {seconds} с")
-            
+                    return render_template(
+                        "nickname.html", 
+                        error=f"Повторно пройти тест можно через {hours} ч {minutes} м {seconds} с"
+                    )
+
+            # Инициализация сессии
             session['nickname'] = nickname
             session['goal'] = goal
             session['time_commit'] = time_commit
             session['answers'] = []
             session['current'] = 0
             session['start_time'] = datetime.now().isoformat()
-            # Перемешиваем вопросы
             session['questions'] = random.sample(questions, len(questions))
             
             return redirect(url_for('question'))
@@ -106,7 +110,6 @@ def question():
             answer_time = (datetime.now() - start_time).total_seconds()
             session['answers'].append({'answer': answer_text if answer_text else "—", 'time': answer_time})
             session['current'] = current + 1
-            # Обновляем время старта для следующего вопроса
             session['start_time'] = datetime.now().isoformat()
             return redirect(url_for('question'))
 
@@ -131,18 +134,19 @@ def result():
         questions_list = session.get('questions', questions)
         goal = session.get('goal')
         time_commit = session.get('time_commit')
-        start_time = datetime.fromisoformat(session.get('start_time'))
-        end_time = datetime.now()
+
         total_time = sum(a['time'] for a in answers)
         avg_time = total_time / len(answers) if answers else 0
 
         # Формируем заголовок сообщения
-        msg_header = f"<b>🎯 Новый участник прошёл тест 🎯</b>\n\n" \
-                     f"<b>Ник:</b> {html.escape(nickname)}\n" \
-                     f"<b>Цель:</b> {html.escape(goal)}\n" \
-                     f"<b>Время на посту:</b> {html.escape(time_commit)}\n" \
-                     f"<b>Общее время:</b> {total_time:.1f} сек\n" \
-                     f"<b>Среднее время на вопрос:</b> {avg_time:.1f} сек\n\n"
+        msg_header = (
+            f"<b>🎯 Новый участник прошёл тест 🎯</b>\n\n"
+            f"<b>Ник:</b> {html.escape(nickname)}\n"
+            f"<b>Цель:</b> {html.escape(goal)}\n"
+            f"<b>Время на посту:</b> {html.escape(time_commit)}\n"
+            f"<b>Общее время:</b> {total_time:.1f} сек\n"
+            f"<b>Среднее время на вопрос:</b> {avg_time:.1f} сек\n\n"
+        )
 
         # Формируем блок с вопросами и ответами
         msg_answers = ""
@@ -151,9 +155,11 @@ def result():
             q_text = q['question'] if isinstance(q, dict) else str(q)
             a_text = ans['answer']
             a_time = ans['time']
-            msg_answers += f"--------------------\n" \
-                           f"<b>{i+1}. {html.escape(q_text)}</b>\n" \
-                           f"Ответ: {html.escape(a_text)} (Время: {a_time:.1f} сек)\n"
+            msg_answers += (
+                f"--------------------\n"
+                f"<b>{i+1}. {html.escape(q_text)}</b>\n"
+                f"Ответ: {html.escape(a_text)} (Время: {a_time:.1f} сек)\n"
+            )
 
         # Разбиваем сообщение на части по 4000 символов
         full_msg = msg_header + msg_answers
