@@ -7,7 +7,8 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: #ffe0b2; /* мягкий светло-оранжевый фон */
+    background-color: #ffe0b2; /* мягкий светло-оранжевый */
+    transition: background 0.5s ease;
 }
 
 /* Контейнер */
@@ -34,6 +35,12 @@ h1 {
     margin-bottom: 30px;
     font-size: 32px;
     letter-spacing: 1px;
+}
+
+/* Ошибки */
+.error {
+    color: red;
+    margin-bottom: 20px;
 }
 
 /* Вопрос */
@@ -64,7 +71,7 @@ input[type="text"]:focus {
 .submit-btn {
     margin-top: 25px;
     padding: 14px 35px;
-    background: #ff9800; /* оранжевая кнопка */
+    background: #ff9800; /* тёплый оранжевый */
     color: white;
     font-size: 18px;
     border: none;
@@ -76,7 +83,7 @@ input[type="text"]:focus {
 
 .submit-btn:hover {
     background: #fb8c00;
-    transform: scale(1.05);
+    transform: scale(1.08);
     box-shadow: 0 8px 20px rgba(0,0,0,0.15);
 }
 
