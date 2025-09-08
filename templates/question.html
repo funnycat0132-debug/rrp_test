@@ -6,14 +6,35 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<div class="container">
-    <h1>Тестирование на пост заместителя R RP 07</h1>
-    <p><b>Вопрос {{ question_number }} из {{ total }}:</b></p>
-    <p>{{ question }}</p>
-    <form method="POST">
-        <input type="text" name="answer" placeholder="Введите ответ" required>
-        <button type="submit" class="submit-btn">Далее</button>
-    </form>
-</div>
+    <div class="container">
+        <h1>Тестирование на пост заместителя R RP 07</h1>
+        <p><b>Вопрос {{ question_number }} из {{ total }}:</b></p>
+        <p>{{ question }}</p>
+        <form method="POST">
+            <input type="text" name="answer" placeholder="Ваш ответ" required>
+            <button type="submit" class="submit-btn">Ответить</button>
+        </form>
+        <p>Ник: {{ nickname }}</p>
+    </div>
+
+    <script>
+        // Функция отправки события на сервер
+        function logTabEvent(eventType) {
+            fetch('/log_tab_event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event: eventType })
+            }).catch(err => console.error("Ошибка отправки события:", err));
+        }
+
+        // Отслеживаем сворачивание и возвращение вкладки
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                logTabEvent('blur');
+            } else {
+                logTabEvent('focus');
+            }
+        });
+    </script>
 </body>
 </html>

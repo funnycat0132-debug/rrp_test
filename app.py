@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, session, redirect, url_for, jsonify
 import json
 from datetime import datetime
 import os
@@ -86,7 +86,8 @@ def index():
             session['current'] = 0
             session['start_time'] = datetime.now().isoformat()
             session['questions'] = random.sample(questions, len(questions))
-            
+            session['tab_events'] = []
+
             return redirect(url_for('question'))
 
         return render_template("nickname.html")
@@ -107,14 +108,19 @@ def question():
             answer_text = request.form.get("answer", "").strip()
             start_time = datetime.fromisoformat(session.get('start_time'))
             answer_time = (datetime.now() - start_time).total_seconds()
-            q_text = questions_list[current]['question'] if isinstance(questions_list[current], dict) else str(questions_list[current])
-            session['answers'].append({'question': q_text, 'answer': answer_text if answer_text else "—", 'time': answer_time})
+            q_data = questions_list[current]
+            q_text = q_data['question'] if isinstance(q_data, dict) else str(q_data)
+            session['answers'].append({
+                'question': q_text,
+                'answer': answer_text if answer_text else "—",
+                'time': answer_time
+            })
             session['current'] = current + 1
             session['start_time'] = datetime.now().isoformat()
             return redirect(url_for('question'))
 
-        question_data = questions_list[current]
-        question_text = question_data['question'] if isinstance(question_data, dict) else str(question_data)
+        q_data = questions_list[current]
+        question_text = q_data['question'] if isinstance(q_data, dict) else str(q_data)
         return render_template(
             "question.html",
             question=question_text,
@@ -125,6 +131,20 @@ def question():
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
+
+@app.route("/log_tab_event", methods=["POST"])
+def log_tab_event():
+    try:
+        event_type = request.json.get("event")
+        timestamp = datetime.now().isoformat()
+        if 'tab_events' not in session:
+            session['tab_events'] = []
+        session['tab_events'].append({'event': event_type, 'time': timestamp})
+        session.modified = True
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route("/result")
 def result():
@@ -137,7 +157,6 @@ def result():
         total_time = sum(a['time'] for a in answers)
         avg_time = total_time / len(answers) if answers else 0
 
-        # Заголовок сообщения
         msg_header = (
             f"<b>🎯 Новый участник прошёл тест 🎯</b>\n\n"
             f"<b>Ник:</b> {html.escape(nickname)}\n"
@@ -147,7 +166,6 @@ def result():
             f"<b>Среднее время на вопрос:</b> {avg_time:.1f} сек\n\n"
         )
 
-        # Блок с вопросами и ответами
         msg_answers = ""
         for i, ans in enumerate(answers):
             q_text = html.escape(ans['question'])
@@ -155,17 +173,32 @@ def result():
             a_time = ans['time']
             msg_answers += (
                 f"--------------------\n"
-                f"<b>{i+1}.</b> {q_text}\n"
+                f"<b>{i+1}. {q_text}</b>\n"
                 f"Ответ: {a_text} (Время: {a_time:.1f} сек)\n"
             )
 
-        # Собираем и режем на части, если слишком длинно
+        # Добавляем события вкладки
+        tab_events = session.get('tab_events', [])
+        if tab_events:
+            blur_times = [e['time'] for e in tab_events if e['event'] == 'blur']
+            focus_times = [e['time'] for e in tab_events if e['event'] == 'focus']
+
+            def format_times(times):
+                return "\n".join([f"- {datetime.fromisoformat(t).strftime('%d.%m.%Y %H:%M:%S')}" for t in times])
+
+            msg_answers += "\n📌 События вкладки:\n"
+            if blur_times:
+                msg_answers += "⚠️ Свернуты:\n" + format_times(blur_times) + "\n"
+            if focus_times:
+                msg_answers += "✅ Вернулся:\n" + format_times(focus_times) + "\n"
+
+        # Разбиваем на части для Telegram
         full_msg = msg_header + msg_answers
         max_len = 4000
         for i in range(0, len(full_msg), max_len):
             send_telegram(full_msg[i:i+max_len])
 
-        # Сохраняем время прохождения пользователя
+        # Сохраняем время прохождения
         users_data = load_users()
         users_data[nickname] = {'last_time': datetime.now().isoformat()}
         save_users(users_data)
