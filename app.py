@@ -14,11 +14,10 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret")
 
-# Файл с вопросами
+# Загружаем вопросы
 with open('questions.json', encoding='utf-8') as f:
     questions = json.load(f)
 
-# Файл для отслеживания времени прохождения пользователей
 USERS_FILE = 'users.json'
 
 def load_users():
@@ -31,10 +30,12 @@ def save_users(users_data):
     with open(USERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(users_data, f, indent=2, ensure_ascii=False)
 
-# Функция отправки сообщений в Telegram
 def send_telegram(message: str):
     token = os.environ.get('TG_TOKEN')
     chat_id = os.environ.get('TG_CHAT_ID')
+    if not token or not chat_id:
+        print("Ошибка: токен или chat_id не указан")
+        return None
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     params = {
         'chat_id': chat_id,
@@ -63,7 +64,6 @@ def index():
             if not nickname or not goal or not time_commit:
                 return render_template("nickname.html", error="Заполните все поля")
 
-            # Проверяем повторное прохождение
             users_data = load_users()
             last_time_str = users_data.get(nickname, {}).get('last_time')
             if last_time_str:
@@ -79,7 +79,6 @@ def index():
                         error=f"Повторно пройти тест можно через {hours} ч {minutes} м {seconds} с"
                     )
 
-            # Инициализация сессии
             session['nickname'] = nickname
             session['goal'] = goal
             session['time_commit'] = time_commit
@@ -108,7 +107,8 @@ def question():
             answer_text = request.form.get("answer", "").strip()
             start_time = datetime.fromisoformat(session.get('start_time'))
             answer_time = (datetime.now() - start_time).total_seconds()
-            session['answers'].append({'answer': answer_text if answer_text else "—", 'time': answer_time})
+            q_text = questions_list[current]['question'] if isinstance(questions_list[current], dict) else str(questions_list[current])
+            session['answers'].append({'question': q_text, 'answer': answer_text if answer_text else "—", 'time': answer_time})
             session['current'] = current + 1
             session['start_time'] = datetime.now().isoformat()
             return redirect(url_for('question'))
@@ -131,14 +131,13 @@ def result():
     try:
         nickname = session.get('nickname')
         answers = session.get('answers', [])
-        questions_list = session.get('questions', questions)
         goal = session.get('goal')
         time_commit = session.get('time_commit')
 
         total_time = sum(a['time'] for a in answers)
         avg_time = total_time / len(answers) if answers else 0
 
-        # Формируем заголовок сообщения
+        # Заголовок сообщения
         msg_header = (
             f"<b>🎯 Новый участник прошёл тест 🎯</b>\n\n"
             f"<b>Ник:</b> {html.escape(nickname)}\n"
@@ -148,20 +147,19 @@ def result():
             f"<b>Среднее время на вопрос:</b> {avg_time:.1f} сек\n\n"
         )
 
-        # Формируем блок с вопросами и ответами
+        # Блок с вопросами и ответами
         msg_answers = ""
         for i, ans in enumerate(answers):
-            q = questions_list[i]
-            q_text = q['question'] if isinstance(q, dict) else str(q)
-            a_text = ans['answer']
+            q_text = html.escape(ans['question'])
+            a_text = html.escape(ans['answer'])
             a_time = ans['time']
             msg_answers += (
                 f"--------------------\n"
-                f"<b>{i+1}. {html.escape(q_text)}</b>\n"
-                f"Ответ: {html.escape(a_text)} (Время: {a_time:.1f} сек)\n"
+                f"<b>{i+1}.</b> {q_text}\n"
+                f"Ответ: {a_text} (Время: {a_time:.1f} сек)\n"
             )
 
-        # Разбиваем сообщение на части по 4000 символов
+        # Собираем и режем на части, если слишком длинно
         full_msg = msg_header + msg_answers
         max_len = 4000
         for i in range(0, len(full_msg), max_len):
@@ -172,7 +170,6 @@ def result():
         users_data[nickname] = {'last_time': datetime.now().isoformat()}
         save_users(users_data)
 
-        # Очистка сессии
         session.clear()
         return render_template("result.html", nickname=nickname)
     except Exception as e:
