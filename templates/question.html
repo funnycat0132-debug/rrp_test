@@ -2,39 +2,47 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Тестирование на пост заместителя R RP 07</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <h1>Тестирование на пост заместителя R RP 07</h1>
+
         <p><b>Вопрос {{ question_number }} из {{ total }}:</b></p>
         <p>{{ question }}</p>
+
         <form method="POST">
-            <input type="text" name="answer" placeholder="Ваш ответ" required>
-            <button type="submit" class="submit-btn">Ответить</button>
+            <input type="text" name="answer" placeholder="Ваш ответ" autocomplete="off" required>
+            <br>
+            <button type="submit" class="submit-btn">Далее</button>
         </form>
-        <p>Ник: {{ nickname }}</p>
+
+        {% if error %}
+        <p style="color:red;">{{ error }}</p>
+        {% endif %}
     </div>
 
+    <!-- Скрипт для отслеживания сворачивания вкладки -->
     <script>
-        // Функция отправки события на сервер
-        function logTabEvent(eventType) {
-            fetch('/log_tab_event', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ event: eventType })
-            }).catch(err => console.error("Ошибка отправки события:", err));
-        }
-
-        // Отслеживаем сворачивание и возвращение вкладки
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                logTabEvent('blur');
-            } else {
-                logTabEvent('focus');
-            }
+    document.addEventListener("DOMContentLoaded", function() {
+        window.addEventListener("blur", function() {
+            fetch("/log_tab_event", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "blur" })
+            }).catch(console.error);
         });
+
+        window.addEventListener("focus", function() {
+            fetch("/log_tab_event", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "focus" })
+            }).catch(console.error);
+        });
+    });
     </script>
 </body>
 </html>

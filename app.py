@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify
+from flask_session import Session
 import json
 from datetime import datetime
 import os
@@ -13,6 +14,13 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret")
+
+# Настройка серверной сессии
+app.config["SESSION_TYPE"] = "filesystem"  # хранение на сервере
+app.config["SESSION_FILE_DIR"] = "./.flask_session"
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_USE_SIGNER"] = True
+Session(app)
 
 # Загружаем вопросы
 with open('questions.json', encoding='utf-8') as f:
@@ -36,22 +44,23 @@ def send_telegram(message: str):
     if not token or not chat_id:
         print("Ошибка: токен или chat_id не указан")
         return None
+
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    params = {
-        'chat_id': chat_id,
-        'text': message,
-        'parse_mode': 'HTML'
-    }
-    try:
-        res = requests.get(url, params=params)
-        response = res.json()
-        print("Telegram API ответ:", response)
-        if not response.get("ok"):
-            print("Ошибка Telegram:", response)
-        return response
-    except Exception as e:
-        print("Ошибка при отправке в Telegram:", e)
-        return None
+
+    # Разбиваем сообщение на части до 4000 символов
+    max_len = 4000
+    responses = []
+    for i in range(0, len(message), max_len):
+        part = message[i:i+max_len]
+        try:
+            res = requests.get(url, params={'chat_id': chat_id, 'text': part})  # без parse_mode
+            response = res.json()
+            responses.append(response)
+            print("Telegram API ответ:", response)
+        except Exception as e:
+            print("Ошибка при отправке в Telegram:", e)
+            responses.append({"ok": False, "error": str(e)})
+    return responses
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -60,7 +69,7 @@ def index():
             nickname = request.form.get("nickname", "").strip()
             goal = request.form.get("goal", "").strip()
             time_commit = request.form.get("time_commit", "").strip()
-            
+
             if not nickname or not goal or not time_commit:
                 return render_template("nickname.html", error="Заполните все поля")
 
@@ -100,7 +109,7 @@ def question():
     try:
         current = session.get('current', 0)
         questions_list = session.get('questions', questions)
-        
+
         if current >= len(questions_list):
             return redirect(url_for('result'))
 
@@ -135,7 +144,8 @@ def question():
 @app.route("/log_tab_event", methods=["POST"])
 def log_tab_event():
     try:
-        event_type = request.json.get("event")
+        data = request.get_json(force=True)
+        event_type = data.get("event")
         timestamp = datetime.now().isoformat()
         if 'tab_events' not in session:
             session['tab_events'] = []
@@ -158,22 +168,22 @@ def result():
         avg_time = total_time / len(answers) if answers else 0
 
         msg_header = (
-            f"<b>🎯 Новый участник прошёл тест 🎯</b>\n\n"
-            f"<b>Ник:</b> {html.escape(nickname)}\n"
-            f"<b>Цель:</b> {html.escape(goal)}\n"
-            f"<b>Время на посту:</b> {html.escape(time_commit)}\n"
-            f"<b>Общее время:</b> {total_time:.1f} сек\n"
-            f"<b>Среднее время на вопрос:</b> {avg_time:.1f} сек\n\n"
+            f"🎯 Новый участник прошёл тест 🎯\n\n"
+            f"Ник: {nickname}\n"
+            f"Цель: {goal}\n"
+            f"Время на посту: {time_commit}\n"
+            f"Общее время: {total_time:.1f} сек\n"
+            f"Среднее время на вопрос: {avg_time:.1f} сек\n\n"
         )
 
         msg_answers = ""
         for i, ans in enumerate(answers):
-            q_text = html.escape(ans['question'])
-            a_text = html.escape(ans['answer'])
+            q_text = ans['question']
+            a_text = ans['answer']
             a_time = ans['time']
             msg_answers += (
                 f"--------------------\n"
-                f"<b>{i+1}. {q_text}</b>\n"
+                f"{i+1}. {q_text}\n"
                 f"Ответ: {a_text} (Время: {a_time:.1f} сек)\n"
             )
 
@@ -192,11 +202,16 @@ def result():
             if focus_times:
                 msg_answers += "✅ Вернулся:\n" + format_times(focus_times) + "\n"
 
-        # Разбиваем на части для Telegram
+        # Отправляем в Telegram
         full_msg = msg_header + msg_answers
         max_len = 4000
-        for i in range(0, len(full_msg), max_len):
-            send_telegram(full_msg[i:i+max_len])
+        token = os.environ.get('TG_TOKEN')
+        chat_id = os.environ.get('TG_CHAT_ID')
+        if token and chat_id:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            for i in range(0, len(full_msg), max_len):
+                part = full_msg[i:i+max_len]
+                requests.get(url, params={'chat_id': chat_id, 'text': part})
 
         # Сохраняем время прохождения
         users_data = load_users()
