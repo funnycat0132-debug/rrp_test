@@ -6,7 +6,6 @@ import os
 import traceback
 import requests
 import random
-import html
 from dotenv import load_dotenv
 
 # Загружаем .env
@@ -16,7 +15,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret")
 
 # Настройка серверной сессии
-app.config["SESSION_TYPE"] = "filesystem"  # хранение на сервере
+app.config["SESSION_TYPE"] = "filesystem"
 app.config["SESSION_FILE_DIR"] = "./.flask_session"
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_USE_SIGNER"] = True
@@ -28,39 +27,18 @@ with open('questions.json', encoding='utf-8') as f:
 
 USERS_FILE = 'users.json'
 
+
 def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {}
 
+
 def save_users(users_data):
     with open(USERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(users_data, f, indent=2, ensure_ascii=False)
 
-def send_telegram(message: str):
-    token = os.environ.get('TG_TOKEN')
-    chat_id = os.environ.get('TG_CHAT_ID')
-    if not token or not chat_id:
-        print("Ошибка: токен или chat_id не указан")
-        return None
-
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-
-    # Разбиваем сообщение на части до 4000 символов
-    max_len = 4000
-    responses = []
-    for i in range(0, len(message), max_len):
-        part = message[i:i+max_len]
-        try:
-            res = requests.get(url, params={'chat_id': chat_id, 'text': part})  # без parse_mode
-            response = res.json()
-            responses.append(response)
-            print("Telegram API ответ:", response)
-        except Exception as e:
-            print("Ошибка при отправке в Telegram:", e)
-            responses.append({"ok": False, "error": str(e)})
-    return responses
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -78,13 +56,13 @@ def index():
             if last_time_str:
                 last_time = datetime.fromisoformat(last_time_str)
                 delta = datetime.now() - last_time
-                if delta.total_seconds() < 48*3600:
-                    remaining = 48*3600 - delta.total_seconds()
+                if delta.total_seconds() < 48 * 3600:
+                    remaining = 48 * 3600 - delta.total_seconds()
                     hours = int(remaining // 3600)
                     minutes = int((remaining % 3600) // 60)
                     seconds = int(remaining % 60)
                     return render_template(
-                        "nickname.html", 
+                        "nickname.html",
                         error=f"Повторно пройти тест можно через {hours} ч {minutes} м {seconds} с"
                     )
 
@@ -103,6 +81,7 @@ def index():
     except Exception as e:
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
+
 
 @app.route("/question", methods=["GET", "POST"])
 def question():
@@ -141,6 +120,7 @@ def question():
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
 
+
 @app.route("/log_tab_event", methods=["POST"])
 def log_tab_event():
     try:
@@ -156,6 +136,7 @@ def log_tab_event():
         traceback.print_exc()
         return jsonify({"status": "error", "error": str(e)}), 500
 
+
 @app.route("/result")
 def result():
     try:
@@ -167,56 +148,26 @@ def result():
         total_time = sum(a['time'] for a in answers)
         avg_time = total_time / len(answers) if answers else 0
 
-        msg_header = (
-            f"🎯 Новый участник прошёл тест 🎯\n\n"
-            f"Ник: {nickname}\n"
-            f"Цель: {goal}\n"
-            f"Время на посту: {time_commit}\n"
-            f"Общее время: {total_time:.1f} сек\n"
-            f"Среднее время на вопрос: {avg_time:.1f} сек\n\n"
-        )
-
-        msg_answers = ""
-        for i, ans in enumerate(answers):
-            q_text = ans['question']
-            a_text = ans['answer']
-            a_time = ans['time']
-            msg_answers += (
-                f"--------------------\n"
-                f"{i+1}. {q_text}\n"
-                f"Ответ: {a_text} (Время: {a_time:.1f} сек)\n"
-            )
-
-        # Добавляем события вкладки
-        tab_events = session.get('tab_events', [])
-        if tab_events:
-            blur_times = [e['time'] for e in tab_events if e['event'] == 'blur']
-            focus_times = [e['time'] for e in tab_events if e['event'] == 'focus']
-
-            def format_times(times):
-                return "\n".join([f"- {datetime.fromisoformat(t).strftime('%d.%m.%Y %H:%M:%S')}" for t in times])
-
-            msg_answers += "\n📌 События вкладки:\n"
-            if blur_times:
-                msg_answers += "⚠️ Свернуты:\n" + format_times(blur_times) + "\n"
-            if focus_times:
-                msg_answers += "✅ Вернулся:\n" + format_times(focus_times) + "\n"
-
-        # Отправляем в Telegram
-        full_msg = msg_header + msg_answers
-        max_len = 4000
-        token = os.environ.get('TG_TOKEN')
-        chat_id = os.environ.get('TG_CHAT_ID')
-        if token and chat_id:
-            url = f"https://api.telegram.org/bot{token}/sendMessage"
-            for i in range(0, len(full_msg), max_len):
-                part = full_msg[i:i+max_len]
-                requests.get(url, params={'chat_id': chat_id, 'text': part})
-
         # Сохраняем время прохождения
         users_data = load_users()
         users_data[nickname] = {'last_time': datetime.now().isoformat()}
         save_users(users_data)
+
+        # 🔥 Отправляем уведомление боту
+        try:
+            requests.post(
+                "https://rrp07-bot-1.onrender.com/notify",
+                json={
+                    "nickname": nickname,
+                    "goal": goal,
+                    "time": time_commit,
+                    "total_time": total_time,
+                    "answers": answers,
+                    "tab_events": session.get("tab_events", [])
+                }
+            )
+        except Exception as e:
+            print("Notify error:", e)
 
         session.clear()
         return render_template("result.html", nickname=nickname)
@@ -224,6 +175,7 @@ def result():
         traceback.print_exc()
         return f"<h2>Ошибка: {e}</h2>"
 
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
